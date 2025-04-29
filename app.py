@@ -3,22 +3,26 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 import sqlite3
 from dataclasses import dataclass
 from typing import List, Optional
+from neo4j import GraphDatabase 
 
 # ======================
 # Database Access Layer
-# ======================
 class Database:
-    def __init__(self, db_name='social_network.db'):
-        self.db_name = db_name
+    def __init__(self):
+        self.uri = "neo4j+s://eb179559.databases.neo4j.io"
+        self.username = "neo4j"
+        self.password = "_pEUmvYSvqzXDcgAoa9AK3--eyk0B4PWfe7Y3pLBBIE"
+        self.driver = GraphDatabase.driver(self.uri, auth=(self.username, self.password))
         self._init_db()
+
     
     def _init_db(self):
-        with self._get_connection() as conn:
-            conn.execute('CREATE CONSTRAINT unique_user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE')
-            conn.execute('CREATE CONSTRAINT unique_username IF NOT EXISTS FOR (u:User) REQUIRE u.username IS UNIQUE')
+        with self.driver.session() as session:
+            session.run('CREATE CONSTRAINT unique_user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE')
+            session.run('CREATE CONSTRAINT unique_username IF NOT EXISTS FOR (u:User) REQUIRE u.username IS UNIQUE')
+
     
-    def _get_connection(self):
-        return sqlite3.connect(self.db_name)
+
     
     # User operations
     def create_user(self, username: str, name: str) -> int:
