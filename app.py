@@ -21,28 +21,34 @@ class Database:
             session.run('CREATE CONSTRAINT unique_user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE')
             session.run('CREATE CONSTRAINT unique_username IF NOT EXISTS FOR (u:User) REQUIRE u.username IS UNIQUE')
 
-    
-
-    
     # User operations
     def create_user(self, username: str, name: str) -> int:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO users (username, name) VALUES (?, ?)', (username, name))
-            return cursor.lastrowid
-    
+        with self.driver.session() as session:
+            result = session.run('''
+                CREATE (u:User {username: $username, name: $name})
+                RETURN id(u) AS id
+            ''', username=username, name=name)
+            record = result.single()
+            return record['id']
+
     def get_user(self, user_id: int) -> Optional[dict]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT id, username, name FROM users WHERE id = ?', (user_id,))
-            row = cursor.fetchone()
-            return {'id': row[0], 'username': row[1], 'name': row[2]} if row else None
+        with self.driver.session() as session:
+            result = session.run('''
+                MATCH (u:User)
+                WHERE id(u) = $user_id
+                RETURN id(u) AS id, u.username AS username, u.name AS name
+            ''', user_id=user_id)
+            record = result.single()
+            return dict(record) if record else None
     
     def get_all_users(self) -> List[dict]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT id, username, name FROM users')
-            return [{'id': row[0], 'username': row[1], 'name': row[2]} for row in cursor.fetchall()]
+        with self.driver.session() as session:
+            result = session.run('''
+                MATCH (u:User)
+                RETURN id(u) AS id, u.username AS username, u.name AS name
+            ''')
+            return [dict(record) for record in result]
+
     
     # Post operations
     def create_post(self, user_id: int, content: str) -> int:
